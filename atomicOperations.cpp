@@ -16,6 +16,7 @@ using namespace std;
 	void *cas(void* args) {
 	for (int i = 0; i < testRuns; ++i )
 	{
+// с этого места потоки должны запускаться одновременно, как этого достичь
 		__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (startTime) :: "rdx");
 		
 		__sync_val_compare_and_swap(pAddr,oldValue2,newValue); // cas C++
@@ -30,6 +31,7 @@ using namespace std;
 	//=============================================================================================
 	for (int i = 0; i < testRuns; ++i )
 	{
+// с этого места потоки должны запускаться одновременно, как этого достичь
 		__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (startTime) :: "rdx");
 		
 		// ============== нужен ли здесь барьер?
@@ -54,6 +56,7 @@ using namespace std;
 	{
 		for (int i = 0; i < testRuns; ++i )
 	{
+// с этого места потоки должны запускаться одновременно, как этого достичь
 		__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (startTime) :: "rdx");
 		
 		__sync_fetch_and_add(pAddr, value); // cas C++
@@ -67,6 +70,7 @@ using namespace std;
 		average = 0;
 		for (int i = 0; i < testRuns; ++i )
 		{
+// с этого места потоки должны запускаться одновременно, как этого достичь
 			__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (startTime) :: "rdx");
 			
 			// ============== нужен ли здесь барьер?
@@ -94,7 +98,6 @@ int main ()
 	{
 		CPU_SET(i, &cpus);
 		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-		//============= нужна синхронизация запуска всех потоков одновременно
 		pthread_create(&threads[i], &attr,cas, NULL);
 	}
 	for (int i = 0; i < numberOfProcessors; ++i)
@@ -106,7 +109,6 @@ int main ()
 	{
 		CPU_SET(i, &cpus);
 		pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-		//============= нужна синхронизация запуска всех потоков одновременно
 		pthread_create(&threads[i], &attr,faa, NULL);
 	}
 	for (int i = 0; i < numberOfProcessors; ++i)
