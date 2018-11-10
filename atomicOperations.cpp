@@ -3,27 +3,20 @@
 #include "hpctimer.c"
 #include <atomic>
 
-
 using namespace std;
 
-static const long long testRuns=10000000;
+static const long long testRuns = 10000000;
 static const int num_threads = 2;
 pthread_barrier_t open_barrier;
-
-
-
 
 void warmUpTLB ()
 {
 	
 }
 
-
 inline void functionCASC (int value, atomic<int> *counter) 
 {
-	do
-	{}
-	while(!counter->compare_exchange_weak(value,value+1)); // cas c++
+	counter->compare_exchange_weak(value,value+1); // cas c++
 }
 
 inline void functionCASAsm (uint64_t*pAddr, uint64_t oldValue1, uint64_t oldValue2, uint64_t newValue) 
@@ -33,14 +26,15 @@ inline void functionCASAsm (uint64_t*pAddr, uint64_t oldValue1, uint64_t oldValu
 				);
 }
 
-inline void functionFAAC()
+inline void functionFAAC(atomic<int> *counter)
 {
-	
+	counter->fetch_add(1);
 }	
 
-inline void functionFAAAsm()
+inline void functionFAAAsm(uint64_t value, uint64_t *pAddr)
 {
-	
+	asm volatile ("lock\n\tcmpxchgq %0, %1" // faa assembler
+				: "+r" (value), "+m" (*pAddr) : : "memory");	
 }
 
 inline double getTime ()
@@ -49,7 +43,6 @@ inline double getTime ()
 	return timeLabel;
 }
 
-
 void* test (void* args)
 {
 	uint64_t oldValue1 = 5;
@@ -57,7 +50,7 @@ void* test (void* args)
 	uint64_t newValue = 0;
 	uint64_t *pAddr = &oldValue1;
 	atomic <int> counter;
-	int value = counter.load(std::memory_order_relaxed);
+	int value = counter.load(memory_order_relaxed);
 	warmUpTLB();
 //======================================================================
 	pthread_barrier_wait(&open_barrier); // с этого места одновременный старт потоков
@@ -68,7 +61,7 @@ void* test (void* args)
 	}
 	double finishTime = getTime();
 	double resultTime = finishTime - startTime;
-	cout << "function CASC resultTime = " << resultTime << " sec" << endl;
+	cout << "CAS C++ resultTime = " << resultTime << " sec" << endl;
 //======================================================================
 	pthread_barrier_wait(&open_barrier); 
 	startTime = getTime();
@@ -78,17 +71,40 @@ void* test (void* args)
 	}
 	finishTime = getTime();
 	resultTime = finishTime - startTime;
-	cout << "function CASAsm resultTime = " << resultTime << " sec" << endl;
+	cout << "CAS Asm resultTime = " << resultTime << " sec" << endl;
 //======================================================================
-	functionFAAC();
-	functionFAAAsm();
+	counter.store(0);
+	pthread_barrier_wait(&open_barrier); 
+	startTime = getTime();
+	for (int i = 0; i < testRuns; ++i)
+	{
+		functionFAAC(&counter);
+	}
+	finishTime = getTime();
+	resultTime = finishTime - startTime;
+	cout << "FAA C++ resultTime = " << resultTime << " sec" << endl;
+//======================================================================
+	int valueFaa = 1;
+	pthread_barrier_wait(&open_barrier); 
+	startTime = getTime();
+	for (int i = 0; i < testRuns; ++i)
+	{
+		functionFAAAsm(valueFaa, pAddr);
+	}
+	finishTime = getTime();
+	resultTime = finishTime - startTime;
+	cout << "FAA Asm resultTime = " << resultTime << " sec" << endl;
+//======================================================================
 	return 0;
 }
+
 //======================================================================
 int main() 
 {
 	long mempagesize = sysconf(_SC_PAGESIZE);
-    cout << "Memory pagesize on this machine : " << mempagesize << " bytes" << endl;
+    cout << "Threads : " << num_threads << endl;
+    cout << "One test cycles : " << testRuns << endl;
+    cout << "Memory pagesize on this machine : " << mempagesize << " bytes" << endl << endl;
     pthread_t threads[num_threads];
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -107,91 +123,3 @@ int main()
     }
 	return 0;
 }
-
-
-
-
-
-
-
-
-
-//uint64_t oldValue1 = 5;
-//uint64_t oldValue2 = 4;
-//uint64_t newValue = 0;
-//uint64_t *pAddr = &oldValue1;
-//uint64_t value = 1;
-
-		//void threadFunctionCAS() 
-		//{
-		  //uint64_t startTime, finishTime, resultTime, average = 0;
-		  //pthread_barrier_wait(&open_barrier); // с этого места одновременный старт потоков
-          //for (int i = 0; i < testRuns; ++i )
-			//{
-				//__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (startTime) :: "rdx");
-		
-				//functionCASC();
-		
-				//__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (finishTime) :: "rdx");
-				//resultTime = finishTime - startTime;
-				//average += resultTime;
-			//}
-			//cout << "Average CAS C++ = " << average/testRuns << " ticks" << endl;
-			//average = 0;
-
-////=============================================================================================
-			//pthread_barrier_wait(&open_barrier); // с этого места одновременный старт потоков
-			//for (int i = 0; i < testRuns; ++i )
-			//{
-				//__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (startTime) :: "rdx");
-		
-				//// ============== нужен ли здесь барьер?
-				//asm volatile("lock\n\tcmpxchgq %1, %2" // cas assembler
-					//: "=a" (newValue)
-					//: "r"  (oldValue1), "m"(*pAddr), "0"(oldValue2)
-					//: "memory"
-					//);
-				//// ============== нужен ли здесь барьер ?
-		
-				//__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (finishTime) :: "rdx");
-				//resultTime = finishTime - startTime;
-				//average += resultTime;
-			 //}	
-		//cout << "Average CAS Assembler = " << average/testRuns << " ticks" << endl;
-     //}
-     
-     
- ////==============================================================================================
-	//void threadFunctionFAA()
-	//{
-		//uint64_t startTime, finishTime, resultTime, average = 0;
-		//pthread_barrier_wait(&open_barrier); // с этого места одновременный старт потоков
-		//for (int i = 0; i < testRuns; ++i )
-		//{
-
-			//__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (startTime) :: "rdx");
-		
-			//__sync_fetch_and_add(pAddr, value); // faa C++
-		
-			//__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (finishTime) :: "rdx");
-			//resultTime = finishTime - startTime;
-			//average += resultTime;
-		//}
-		//cout << "Average FAA C++ = " << average/testRuns << " ticks" << endl;
-////===============================================================================================
-		//average = 0;
-		//pthread_barrier_wait(&open_barrier); // с этого места одновременный старт потоков
-		//for (int i = 0; i < testRuns; ++i )
-		//{
-			//__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (startTime) :: "rdx");
-			//// ============== нужен ли здесь барьер?
-			//asm volatile ("lock\n\tcmpxchgq %0, %1" // faa assembler
-			//: "+r" (value), "+m" (*pAddr) : : "memory");
-			//// ============== нужен ли здесь барьер ?
-		
-			//__asm__ volatile ("rdtsc\n\tshl $32, %%rdx\n\tor %%rdx, %%rax" : "=a" (finishTime) :: "rdx");
-			//resultTime = finishTime - startTime;
-			//average += resultTime;
-		//}
-		//cout << "Average FAA Assembler = " << average/testRuns << " ticks" << endl;
-//}
