@@ -7,6 +7,7 @@ using namespace std;
 
 static const long long testRuns = 10000000;
 static const int num_threads = 2;
+int dataSize = 0;
 pthread_barrier_t open_barrier;
 
 void warmUpTLB ()
@@ -28,7 +29,7 @@ inline void functionCASAsm (uint64_t*pAddr, uint64_t oldValue1, uint64_t oldValu
 
 inline void functionFAAC(atomic<int> *counter)
 {
-	counter->fetch_add(1);
+	counter->fetch_add(1); // faa c++
 }	
 
 inline void functionFAAAsm(uint64_t value, uint64_t *pAddr)
@@ -45,22 +46,31 @@ inline double getTime ()
 
 void* test (void* args)
 {
+	char * buffer = (char*) malloc(dataSize);
+	if (buffer==NULL) 
+	{
+		cout << "Не удалось выделить память" << endl;
+		exit (1);
+	}
+	//for (int ix = 0; ix < dataSize; ix++)
+    //buffer[ix] = rand() % 26 + 'a';
 	uint64_t oldValue1 = 5;
 	uint64_t oldValue2 = 4;
 	uint64_t newValue = 0;
 	uint64_t *pAddr = &oldValue1;
 	atomic <int> counter;
 	int value = counter.load(memory_order_relaxed);
+	double startTime, finishTime, resultTime;
 	warmUpTLB();
 //======================================================================
-	pthread_barrier_wait(&open_barrier); // с этого места одновременный старт потоков
-	double startTime = getTime();
+	pthread_barrier_wait(&open_barrier);
+	startTime = getTime();
 	for (int i = 0; i < testRuns; ++i)
 	{
 		functionCASC(value, &counter);
 	}
-	double finishTime = getTime();
-	double resultTime = finishTime - startTime;
+	finishTime = getTime();
+	resultTime = finishTime - startTime;
 	cout << "CAS C++ resultTime = " << resultTime << " sec" << endl;
 //======================================================================
 	pthread_barrier_wait(&open_barrier); 
@@ -95,6 +105,7 @@ void* test (void* args)
 	resultTime = finishTime - startTime;
 	cout << "FAA Asm resultTime = " << resultTime << " sec" << endl;
 //======================================================================
+	free(buffer);
 	return 0;
 }
 
@@ -105,6 +116,9 @@ int main()
     cout << "Threads : " << num_threads << endl;
     cout << "One test cycles : " << testRuns << endl;
     cout << "Memory pagesize on this machine : " << mempagesize << " bytes" << endl << endl;
+	cout << "Укажите размер данных в байтах, максимум 2100000000: ";
+	cin >> dataSize;
+	cout << endl;
     pthread_t threads[num_threads];
     pthread_attr_t attr;
     pthread_attr_init(&attr);
