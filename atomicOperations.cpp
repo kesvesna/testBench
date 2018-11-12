@@ -27,7 +27,7 @@ inline void functionCASAsm (char * pAddr, char * oldValue, char * newValue, char
 				: "=a" (returnValue) : "r"  (newValue), "m"(pAddr), "0"(oldValue) : "memory"
 				);
 }
-
+// не уверен, что FAA правильно сделал
 inline void functionFAAC(atomic<char> *counter)
 {
 	counter->fetch_add(1); // faa c++
@@ -90,7 +90,7 @@ void* test (void* args)
 	startTime = getTime();
 	for ( int j = 0; j < dataSize; ++j)
 	{
-		functionFAAC(&counter);
+		functionFAAC(&counter); // не уверен, что правильно сделан FAA
 	}
 	finishTime = getTime();
 	resultTime = finishTime - startTime;
