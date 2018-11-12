@@ -2,12 +2,13 @@
 #include <unistd.h>
 #include "hpctimer.c"
 #include <atomic>
+#include <time.h>
 
 using namespace std;
 
 static const long long testRuns = 10000000;
 static const int num_threads = 2;
-int dataSize = 0;
+long long dataSize = 0;
 pthread_barrier_t open_barrier;
 
 void warmUpTLB ()
@@ -15,27 +16,27 @@ void warmUpTLB ()
 	
 }
 
-inline void functionCASC (int value, atomic<int> *counter) 
+inline void functionCASC (char  value, atomic<char> *counter) 
 {
-	counter->compare_exchange_weak(value,value+1); // cas c++
+	counter->compare_exchange_weak(value,value+'1'); // cas c++
 }
 
-inline void functionCASAsm (uint64_t*pAddr, uint64_t oldValue1, uint64_t oldValue2, uint64_t newValue) 
+inline void functionCASAsm (char * pAddr, char * oldValue, char * newValue, char * returnValue) 
 {
 	asm volatile("lock\n\tcmpxchgq %1, %2" // cas assembler
-				: "=a" (newValue) : "r"  (oldValue1), "m"(*pAddr), "0"(oldValue2) : "memory"
+				: "=a" (returnValue) : "r"  (newValue), "m"(pAddr), "0"(oldValue) : "memory"
 				);
 }
 
-inline void functionFAAC(atomic<int> *counter)
+inline void functionFAAC(atomic<char> *counter)
 {
 	counter->fetch_add(1); // faa c++
 }	
 
-inline void functionFAAAsm(uint64_t value, uint64_t *pAddr)
+inline void functionFAAAsm(char * value, char *pAddr)
 {
 	asm volatile ("lock\n\tcmpxchgq %0, %1" // faa assembler
-				: "+r" (value), "+m" (*pAddr) : : "memory");	
+				: "+r" (value), "+m" (pAddr) : : "memory");	
 }
 
 inline double getTime ()
@@ -47,38 +48,39 @@ inline double getTime ()
 void* test (void* args)
 {
 	char * buffer = (char*) malloc(dataSize);
-	if (buffer==NULL) 
+	if (buffer == NULL) 
 	{
 		cout << "Не удалось выделить память" << endl;
 		exit (1);
 	}
-	//for (int ix = 0; ix < dataSize; ix++)
+	cout << "Идет заполнение буфера" << endl;
+	for (int ix = 0; ix < dataSize; ix++)
     //buffer[ix] = rand() % 26 + 'a';
-	uint64_t oldValue1 = 5;
-	uint64_t oldValue2 = 4;
-	uint64_t newValue = 0;
-	uint64_t *pAddr = &oldValue1;
-	atomic <int> counter;
-	int value = counter.load(memory_order_relaxed);
+    buffer[ix] = 'a';
+    cout << "Буфер заполнен" << endl;
+	char returnValue = 'a';
+	atomic <char> counter;
+	buffer[0] = counter.load(memory_order_relaxed);
 	double startTime, finishTime, resultTime;
+	pthread_barrier_wait(&open_barrier);
 	warmUpTLB();
 //======================================================================
 	pthread_barrier_wait(&open_barrier);
 	startTime = getTime();
-	for (int i = 0; i < testRuns; ++i)
-	{
-		functionCASC(value, &counter);
-	}
+		for ( int j = 0; j < dataSize; ++j)
+		{
+			functionCASC(buffer[j], &counter);
+		}
 	finishTime = getTime();
 	resultTime = finishTime - startTime;
 	cout << "CAS C++ resultTime = " << resultTime << " sec" << endl;
 //======================================================================
 	pthread_barrier_wait(&open_barrier); 
 	startTime = getTime();
-	for (int i = 0; i < testRuns; ++i)
-	{
-		functionCASAsm(pAddr, oldValue1, oldValue2, newValue);
-	}
+		for ( int j = 0; j < dataSize; ++j)
+		{
+			functionCASAsm(buffer, &buffer[j], &buffer[j], &returnValue);
+		}
 	finishTime = getTime();
 	resultTime = finishTime - startTime;
 	cout << "CAS Asm resultTime = " << resultTime << " sec" << endl;
@@ -86,7 +88,7 @@ void* test (void* args)
 	counter.store(0);
 	pthread_barrier_wait(&open_barrier); 
 	startTime = getTime();
-	for (int i = 0; i < testRuns; ++i)
+	for ( int j = 0; j < dataSize; ++j)
 	{
 		functionFAAC(&counter);
 	}
@@ -94,13 +96,12 @@ void* test (void* args)
 	resultTime = finishTime - startTime;
 	cout << "FAA C++ resultTime = " << resultTime << " sec" << endl;
 //======================================================================
-	int valueFaa = 1;
 	pthread_barrier_wait(&open_barrier); 
 	startTime = getTime();
-	for (int i = 0; i < testRuns; ++i)
-	{
-		functionFAAAsm(valueFaa, pAddr);
-	}
+		for ( int j = 0; j < dataSize; ++j)
+		{
+			functionFAAAsm(&buffer[j], buffer);
+		}
 	finishTime = getTime();
 	resultTime = finishTime - startTime;
 	cout << "FAA Asm resultTime = " << resultTime << " sec" << endl;
@@ -112,11 +113,15 @@ void* test (void* args)
 //======================================================================
 int main() 
 {
+	time_t myTime;
+	myTime = time(NULL);
+	cout << "Test start: " << ctime(&myTime) << endl;
+	cout << "============================================" << endl << endl;
 	long mempagesize = sysconf(_SC_PAGESIZE);
     cout << "Threads : " << num_threads << endl;
-    cout << "One test cycles : " << testRuns << endl;
+    //cout << "One test cycles : " << testRuns << endl;
     cout << "Memory pagesize on this machine : " << mempagesize << " bytes" << endl << endl;
-	cout << "Укажите размер данных в байтах, максимум 2100000000: ";
+	cout << "Укажите размер буфера данных в байтах (max 2147483647 (2Gb)): " ;
 	cin >> dataSize;
 	cout << endl;
     pthread_t threads[num_threads];
@@ -135,5 +140,9 @@ int main()
     {
         pthread_join(threads[i],NULL);
     }
+    time_t myTime2;
+	myTime2 = time(NULL);
+	cout << endl << "=============================================" << endl;
+	cout << "Test finish: " << ctime(&myTime2) << endl;
 	return 0;
 }
