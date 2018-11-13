@@ -55,94 +55,94 @@ void* test (void* args)
 	if ( dataSize > 1000000 && dataSize <= 1000000000 ) { scale = 10000; }
 	for ( long long testSizeBuffer = 0; testSizeBuffer <= dataSize; testSizeBuffer += scale )
 	{
-	char * buffer = (char*) malloc(testSizeBuffer);
-	if (buffer == NULL) 
-	{
-		cout << "Не удалось выделить память" << endl;
-		exit (1);
-	}
-	//clflush(buffer,dataSize,cpuinfo);
-	//cout << "Идет заполнение буфера" << endl;
-	for (int ix = 0; ix < testSizeBuffer; ix++)
-    //buffer[ix] = rand() % 26 + 'a'; // раскомментить после отладки
-    buffer[ix] = 'a'; // для отладки, быстрое заполнение буфера, закоментить после отладки
-   // cout << "Буфер заполнен" << endl;
-	char returnValue = 'a';
-	atomic <char> counter;
-	buffer[0] = counter.load(memory_order_relaxed);
-	double startTime, finishTime, resultTime;
-	//fputs("%Размер буфера данных = ", outputResult);
-    //fprintf(outputResult,"%lld", testSizeBuffer);
-    //fputs(" byte", outputResult);
-   // fputs("\n",outputResult);
-	//pthread_barrier_wait(&open_barrier);
-	//warmUpTLB();
+		char * buffer = (char*) malloc(testSizeBuffer);
+		if (buffer == NULL) 
+		{
+			cout << "Не удалось выделить память" << endl;
+			exit (1);
+		}
+		//clflush(buffer,dataSize,cpuinfo);
+		//cout << "Идет заполнение буфера" << endl;
+		for (int ix = 0; ix < testSizeBuffer; ix++)
+		//buffer[ix] = rand() % 26 + 'a'; // раскомментить после отладки
+		buffer[ix] = 'a'; // для отладки, быстрое заполнение буфера, закоментить после отладки
+		// cout << "Буфер заполнен" << endl;
+		char returnValue = 'a';
+		atomic <char> counter;
+		buffer[0] = counter.load(memory_order_relaxed);
+		double startTime, finishTime, resultTime;
+		//fputs("%Размер буфера данных = ", outputResult);
+		//fprintf(outputResult,"%lld", testSizeBuffer);
+		//fputs(" byte", outputResult);
+		// fputs("\n",outputResult);
+		//pthread_barrier_wait(&open_barrier);
+		//warmUpTLB();
 //======================================================================
-	pthread_barrier_wait(&open_barrier);
-	startTime = getTime();
+		pthread_barrier_wait(&open_barrier);
+		startTime = getTime();
 		for ( int j = 0; j < testSizeBuffer; ++j)
 		{
 			functionCASC(buffer[j], &counter);
 		}
-	finishTime = getTime();
-	resultTime = finishTime - startTime;
-	//cout << "CAS C++ resultTime = " << resultTime << " sec" << endl;
-	if (outInFile)
-	{
-		fputs("arrCasCTime = [arrCasCTime ", outputResult);
-		fprintf(outputResult,"%f", resultTime);
-		fputs("];", outputResult);
-		fputs("\n",outputResult);
-		fputs("arrCasCData = [arrCasCData ", outputResult);
-		fprintf(outputResult,"%lld", testSizeBuffer);
-		fputs("];", outputResult);
-		fputs("\n",outputResult);
-	}
+		finishTime = getTime();
+		resultTime = finishTime - startTime;
+		//cout << "CAS C++ resultTime = " << resultTime << " sec" << endl;
+		if (outInFile)
+		{
+			fputs("arrCasCTime = [arrCasCTime ", outputResult);
+			fprintf(outputResult,"%f", resultTime);
+			fputs("];", outputResult);
+			fputs("\n",outputResult);
+			fputs("arrCasCData = [arrCasCData ", outputResult);
+			fprintf(outputResult,"%lld", testSizeBuffer);
+			fputs("];", outputResult);
+			fputs("\n",outputResult);
+		}
 //======================================================================
-	//pthread_barrier_wait(&open_barrier); 
-	startTime = getTime();
+		//pthread_barrier_wait(&open_barrier); 
+		startTime = getTime();
 		for ( int j = 0; j < testSizeBuffer; ++j)
 		{
 			functionCASAsm(buffer, &buffer[j], &buffer[j], &returnValue);
 		}
-	finishTime = getTime();
-	resultTime = finishTime - startTime;
-	//cout << "CAS Asm resultTime = " << resultTime << " sec" << endl;
-	//fputs("%CAS Asm resultTime = ", outputResult);
-   // fprintf(outputResult,"%f", resultTime);
-    //fputs(" sec", outputResult);
-   // fputs("\n",outputResult);
+		finishTime = getTime();
+		resultTime = finishTime - startTime;
+		//cout << "CAS Asm resultTime = " << resultTime << " sec" << endl;
+		//fputs("%CAS Asm resultTime = ", outputResult);
+		// fprintf(outputResult,"%f", resultTime);
+		//fputs(" sec", outputResult);
+		// fputs("\n",outputResult);
 //======================================================================
-	counter.store(0);
-	//pthread_barrier_wait(&open_barrier); 
-	startTime = getTime();
-	for ( int j = 0; j < testSizeBuffer; ++j)
-	{
-		functionFAAC(&counter); // не уверен, что правильно сделан FAA
-	}
-	finishTime = getTime();
-	resultTime = finishTime - startTime;
-	//cout << "FAA C++ resultTime = " << resultTime << " sec" << endl;
-	//fputs("%FAA C++ resultTime = ", outputResult);
-    //fprintf(outputResult,"%f", resultTime);
-   // fputs(" sec", outputResult);
-   // fputs("\n",outputResult);
+		counter.store(0);
+		//pthread_barrier_wait(&open_barrier); 
+		startTime = getTime();
+		for ( int j = 0; j < testSizeBuffer; ++j)
+		{
+			functionFAAC(&counter); // не уверен, что правильно сделан FAA
+		}
+		finishTime = getTime();
+		resultTime = finishTime - startTime;
+		//cout << "FAA C++ resultTime = " << resultTime << " sec" << endl;
+		//fputs("%FAA C++ resultTime = ", outputResult);
+		//fprintf(outputResult,"%f", resultTime);
+		// fputs(" sec", outputResult);
+		// fputs("\n",outputResult);
 //======================================================================
-	//pthread_barrier_wait(&open_barrier); 
-	startTime = getTime();
+		//pthread_barrier_wait(&open_barrier); 
+		startTime = getTime();
 		for ( int j = 0; j < testSizeBuffer; ++j)
 		{
 			functionFAAAsm(&buffer[j], buffer);
 		}
-	finishTime = getTime();
-	resultTime = finishTime - startTime;
-	//cout << "FAA Asm resultTime = " << resultTime << " sec" << endl;
-	//fputs("%FAA Asm resultTime = ", outputResult);
-    //fprintf(outputResult,"%f", resultTime);
-    //fputs(" sec", outputResult);
-   // fputs("\n",outputResult);
+		finishTime = getTime();
+		resultTime = finishTime - startTime;
+		//cout << "FAA Asm resultTime = " << resultTime << " sec" << endl;
+		//fputs("%FAA Asm resultTime = ", outputResult);
+		//fprintf(outputResult,"%f", resultTime);
+		//fputs(" sec", outputResult);
+		// fputs("\n",outputResult);
 //======================================================================
-	free(buffer);
+		free(buffer);
 	}
 	return 0;
 }
@@ -175,7 +175,6 @@ int main()
 	cout << "Укажите размер буфера данных в байтах (max 2147483647 (2Gb)): " ;
 	cin >> dataSize;
 	cout << endl;
-	
 	fputs("%Buffer size for test : ", outputResult);
     fprintf(outputResult,"%llu", dataSize);
     fputs(" bytes", outputResult);
