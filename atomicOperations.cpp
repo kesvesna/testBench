@@ -51,8 +51,10 @@ void* test (void* args)
 {
 	bool outInFile = (bool*) args;
 	int scale = 64;
-	if ( dataSize > 4096 && dataSize <= 1000000 ) { scale = 1000; }
-	if ( dataSize > 1000000 && dataSize <= 1000000000 ) { scale = 10000; }
+	int cycleStep = 1;
+	if ( dataSize > 4096 && dataSize <= 1000000 ) { scale = 5000; }
+	if ( dataSize > 1000000 && dataSize <= 1000000000 ) { scale = 90000; cycleStep = 1024; }
+	if ( dataSize > 1000000000 ) { scale = 1000000; cycleStep = 8192; }
 	for ( long long testSizeBuffer = 0; testSizeBuffer <= dataSize; testSizeBuffer += scale )
 	{
 		char * buffer = (char*) malloc(testSizeBuffer);
@@ -64,8 +66,10 @@ void* test (void* args)
 		//clflush(buffer,dataSize,cpuinfo);
 		//cout << "Идет заполнение буфера" << endl;
 		for (int ix = 0; ix < testSizeBuffer; ix++)
-		//buffer[ix] = rand() % 26 + 'a'; // раскомментить после отладки
-		buffer[ix] = 'a'; // для отладки, быстрое заполнение буфера, закоментить после отладки
+		{
+			//buffer[ix] = rand() % 26 + 'a'; // раскомментить после отладки
+			buffer[ix] = 'a'; // для отладки, быстрое заполнение буфера, закоментить после отладки
+		}
 		// cout << "Буфер заполнен" << endl;
 		char returnValue = 'a';
 		atomic <char> counter;
@@ -80,7 +84,7 @@ void* test (void* args)
 //======================================================================
 		pthread_barrier_wait(&open_barrier);
 		startTime = getTime();
-		for ( int j = 0; j < testSizeBuffer; ++j)
+		for ( int j = 0; j < testSizeBuffer; j = j + cycleStep )
 		{
 			functionCASC(buffer[j], &counter);
 		}
@@ -93,7 +97,7 @@ void* test (void* args)
 			fprintf(outputResult,"%f", resultTime);
 			fputs("];", outputResult);
 			fputs("\n",outputResult);
-			fputs("arrCasCData = [arrCasCData ", outputResult);
+			fputs("arrData = [arrData ", outputResult);
 			fprintf(outputResult,"%lld", testSizeBuffer);
 			fputs("];", outputResult);
 			fputs("\n",outputResult);
@@ -101,46 +105,52 @@ void* test (void* args)
 //======================================================================
 		//pthread_barrier_wait(&open_barrier); 
 		startTime = getTime();
-		for ( int j = 0; j < testSizeBuffer; ++j)
+		for ( int j = 0; j < testSizeBuffer; j = j + cycleStep )
 		{
 			functionCASAsm(buffer, &buffer[j], &buffer[j], &returnValue);
 		}
 		finishTime = getTime();
 		resultTime = finishTime - startTime;
-		//cout << "CAS Asm resultTime = " << resultTime << " sec" << endl;
-		//fputs("%CAS Asm resultTime = ", outputResult);
-		// fprintf(outputResult,"%f", resultTime);
-		//fputs(" sec", outputResult);
-		// fputs("\n",outputResult);
+		if (outInFile)
+		{
+			fputs("arrCasAsmTime = [arrCasAsmTime ", outputResult);
+			fprintf(outputResult,"%f", resultTime);
+			fputs("];", outputResult);
+			fputs("\n",outputResult);
+		}
 //======================================================================
 		counter.store(0);
 		//pthread_barrier_wait(&open_barrier); 
 		startTime = getTime();
-		for ( int j = 0; j < testSizeBuffer; ++j)
+		for ( int j = 0; j < testSizeBuffer; j = j + cycleStep )
 		{
 			functionFAAC(&counter); // не уверен, что правильно сделан FAA
 		}
 		finishTime = getTime();
 		resultTime = finishTime - startTime;
-		//cout << "FAA C++ resultTime = " << resultTime << " sec" << endl;
-		//fputs("%FAA C++ resultTime = ", outputResult);
-		//fprintf(outputResult,"%f", resultTime);
-		// fputs(" sec", outputResult);
-		// fputs("\n",outputResult);
+		if (outInFile)
+		{
+			fputs("arrFaaCTime = [arrFaaCTime ", outputResult);
+			fprintf(outputResult,"%f", resultTime);
+			fputs("];", outputResult);
+			fputs("\n",outputResult);
+		}
 //======================================================================
 		//pthread_barrier_wait(&open_barrier); 
 		startTime = getTime();
-		for ( int j = 0; j < testSizeBuffer; ++j)
+		for ( int j = 0; j < testSizeBuffer; j = j + cycleStep )
 		{
 			functionFAAAsm(&buffer[j], buffer);
 		}
 		finishTime = getTime();
 		resultTime = finishTime - startTime;
-		//cout << "FAA Asm resultTime = " << resultTime << " sec" << endl;
-		//fputs("%FAA Asm resultTime = ", outputResult);
-		//fprintf(outputResult,"%f", resultTime);
-		//fputs(" sec", outputResult);
-		// fputs("\n",outputResult);
+		if (outInFile)
+		{
+			fputs("arrFaaAsmTime = [arrFaaAsmTime ", outputResult);
+			fprintf(outputResult,"%f", resultTime);
+			fputs("];", outputResult);
+			fputs("\n",outputResult);
+		}
 //======================================================================
 		free(buffer);
 	}
@@ -179,20 +189,20 @@ int main()
     fprintf(outputResult,"%llu", dataSize);
     fputs(" bytes", outputResult);
     fputs("\n",outputResult);
-    fputs("arrCasCData = [];", outputResult);
+    fputs("arrData = [];", outputResult);
     fputs("\n",outputResult);
     fputs("arrCasCTime = [];", outputResult);
     fputs("\n",outputResult);
-    fputs("arrCasAsmData = [];", outputResult);
-    fputs("\n",outputResult);
+   // fputs("arrCasAsmData = [];", outputResult);
+   // fputs("\n",outputResult);
     fputs("arrCasAsmTime = [];", outputResult);
     fputs("\n",outputResult);
-    fputs("arrFaaCData = [];", outputResult);
-    fputs("\n",outputResult);
+   // fputs("arrFaaCData = [];", outputResult);
+   // fputs("\n",outputResult);
     fputs("arrFaaCTime = [];", outputResult);
     fputs("\n",outputResult);
-    fputs("arrFaaAsmData = [];", outputResult);
-    fputs("\n",outputResult);
+   // fputs("arrFaaAsmData = [];", outputResult);
+    //fputs("\n",outputResult);
     fputs("arrFaaAsmTime = [];", outputResult);
     fputs("\n",outputResult);
     pthread_t threads[num_threads];
@@ -226,7 +236,23 @@ int main()
 	fputs("%Test finish: ", outputResult);
 	fputs(ctime(&myTime2), outputResult);
 	fputs("\n",outputResult);
-	fputs("plot(arrCasCData,arrCasCTime)", outputResult);
+	fputs("plot(arrData,arrCasCTime)", outputResult);
+    fputs("\n",outputResult);
+    fputs("hold on", outputResult);
+    fputs("\n",outputResult);
+    fputs("plot(arrData,arrCasAsmTime)", outputResult);
+    fputs("\n",outputResult);
+    fputs("plot(arrData,arrFaaCTime)", outputResult);
+    fputs("\n",outputResult);
+    fputs("plot(arrData,arrFaaAsmTime)", outputResult);
+    fputs("\n",outputResult);
+    fputs("grid on", outputResult);
+    fputs("\n",outputResult);
+    fputs("legend('CAS C','CAS Asm','FAA C','FAA Asm','Location','North')", outputResult);
+    fputs("\n",outputResult);
+    fputs("xlabel('Размер буфера данных в байтах')", outputResult);
+    fputs("\n",outputResult);
+    fputs("ylabel('Задержка в секундах')", outputResult);
     fputs("\n",outputResult);
 	fclose(outputResult);
 	return 0;
