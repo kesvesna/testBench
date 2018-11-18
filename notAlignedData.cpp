@@ -9,8 +9,8 @@ using namespace std;
 using namespace std::chrono;
 
 long long operations = 0;
-long long testRuns = 150;
-long long warmUpOperations = 2000000000;
+long long testRuns = 200;
+long long warmUpOperations = 4000000000;
 ofstream fout;
 
 inline void functionCASAsm (bool * pAddr1, bool * oldValue1, bool * newValue1, bool * returnValue1) 
@@ -54,9 +54,10 @@ inline void functionFAAAsm(double * oldValue3, double *pAddr3)
 
 void warmUp()
 {
+	//cout << "warmUp in proccess ..." << endl;
 	bool oldValue1 = 1, newValue1 = 0, returnValue1;
 	bool * pAddr1 = &oldValue1;
-	for ( int i = 0; i < warmUpOperations; ++i )
+	for ( long long i = 0; i < warmUpOperations; ++i )
 	{
 	functionCASAsm (pAddr1,&oldValue1,&newValue1,&returnValue1);
 	}
@@ -73,12 +74,12 @@ void testFunction()
 	high_resolution_clock::time_point start;
 	high_resolution_clock::time_point end;
 	warmUp();
-	for ( int i = 0; i < testRuns; ++i )
+	for ( long long i = 0; i < testRuns; ++i )
 	{
 	operations += 100000;
 //======================================================================	
 	start = high_resolution_clock::now();
-	for ( int i = 0; i < operations; ++i )
+	for ( long long i = 0; i < operations; ++i )
 	{
 	functionCASAsm (pAddr1,&oldValue1,&newValue1,&returnValue1);
 	}
@@ -88,7 +89,7 @@ void testFunction()
 	fout << "arrBoolCasAsmTime = [arrBoolCasAsmTime " << elapsed/operations << "];" << endl;
 //======================================================================
 	start = high_resolution_clock::now();
-	for ( int i = 0; i < operations; ++i )
+	for ( long long i = 0; i < operations; ++i )
 	{
 	functionFAAAsm (&oldValue1,pAddr1);
 	}
@@ -97,7 +98,7 @@ void testFunction()
 	fout << "arrBoolFaaAsmTime = [arrBoolFaaAsmTime " << elapsed/operations << "];" << endl;
 //======================================================================
 	start = high_resolution_clock::now();
-	for ( int i = 0; i < operations; ++i )
+	for ( long long i = 0; i < operations; ++i )
 	{
 	functionCASAsm (pAddr2,&oldValue2,&newValue2,&returnValue2);
 	}
@@ -106,7 +107,7 @@ void testFunction()
 	fout << "arrIntCasAsmTime = [arrIntCasAsmTime " << elapsed/operations << "];" << endl;
 //======================================================================
 	start = high_resolution_clock::now();
-	for ( int i = 0; i < operations; ++i )
+	for ( long long i = 0; i < operations; ++i )
 	{
 	functionFAAAsm (&oldValue2,pAddr2);
 	}
@@ -115,7 +116,7 @@ void testFunction()
 	fout << "arrIntFaaAsmTime = [arrIntFaaAsmTime " << elapsed/operations << "];" << endl;
 //======================================================================
 	start = high_resolution_clock::now();
-	for ( int i = 0; i < operations; ++i )
+	for ( long long i = 0; i < operations; ++i )
 	{
 	functionCASAsm (pAddr3,&oldValue3,&newValue3,&returnValue3);
 	}
@@ -124,7 +125,7 @@ void testFunction()
 	fout << "arrDoubleCasAsmTime = [arrDoubleCasAsmTime " << elapsed/operations << "];" << endl;
 //======================================================================
 	start = high_resolution_clock::now();
-	for ( int i = 0; i < operations; ++i )
+	for ( long long i = 0; i < operations; ++i )
 	{
 	functionFAAAsm (&oldValue3,pAddr3);
 	}
@@ -173,7 +174,7 @@ int main ()
 	fout << "arrDoubleCasAsmTime = smooth(arrDoubleCasAsmTime);" << endl;
 	fout << "arrDoubleFaaAsmTime = smooth(arrDoubleFaaAsmTime);" << endl;
 	fout << "hold on" << endl;
-	fout << "axis([-1000000 16000000 23.5 27.5])" << endl;
+	fout << "axis([-1000000 22000000 23.5 27.5])" << endl;
 	fout << "plot(arrOperations,arrBoolCasAsmTime,'*-')" << endl;
 	fout << "plot(arrOperations,arrIntCasAsmTime,'*-')" << endl;
 	fout << "plot(arrOperations,arrDoubleCasAsmTime,'*-')" << endl;
