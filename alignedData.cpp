@@ -9,8 +9,8 @@ using namespace std;
 using namespace std::chrono;
 
 long long operations = 0;
-long long testRuns = 210;
-long long warmUpOperations = 4000000000;
+long long testRuns = 200;
+long long warmUpOperations = 200000000; // достаточно для прогрева
 ofstream fout;
 
 struct boolAlignedData {
@@ -28,43 +28,19 @@ struct doubleAlignedData {
 	bool padding[51] = {0};
 }firstDoubleData;
 
-inline void functionCASAsm (bool * pAddr1, bool * oldValue1, bool * newValue1, bool * returnValue1) 
+template <typename T>
+inline void functionCASAsm (const T * pAddr1, const T * oldValue1, const T * newValue1, const T * returnValue1)
 {
-	asm volatile("lock\n\tcmpxchgq %1, %2" // cas assembler
-				: "=a" (returnValue1) : "r"  (newValue1), "m"(pAddr1), "0"(oldValue1) : "memory"
-				);
-}
+	asm volatile ("lock\n\tcmpxchgq %1, %2" //cas assembler
+					: "=a" (returnValue1) : "r" (newValue1), "m" (pAddr1), "0" (oldValue1) : "memory"
+					);
+} 
 
-inline void functionFAAAsm(bool * oldValue1, bool *pAddr1)
+template <typename T2>
+inline void functionFAAAsm(const T2 * oldValue1, const T2 * pAddr1)
 {
 	asm volatile ("lock\n\tcmpxchgq %0, %1" // faa assembler
-				: "+r" (oldValue1), "+m" (pAddr1) : : "memory");	
-}
-
-inline void functionCASAsm (int * pAddr2, int * oldValue2, int * newValue2, int * returnValue2) 
-{
-	asm volatile("lock\n\tcmpxchgq %1, %2" // cas assembler
-				: "=a" (returnValue2) : "r"  (newValue2), "m"(pAddr2), "0"(oldValue2) : "memory"
-				);
-}
-
-inline void functionFAAAsm(int * oldValue2, int *pAddr2)
-{
-	asm volatile ("lock\n\tcmpxchgq %0, %1" // faa assembler
-				: "+r" (oldValue2), "+m" (pAddr2) : : "memory");	
-}
-
-inline void functionCASAsm (double * pAddr3, double * oldValue3, double * newValue3, double * returnValue3) 
-{
-	asm volatile("lock\n\tcmpxchgq %1, %2" // cas assembler
-				: "=a" (returnValue3) : "r"  (newValue3), "m"(pAddr3), "0"(oldValue3) : "memory"
-				);
-}
-
-inline void functionFAAAsm(double * oldValue3, double *pAddr3)
-{
-	asm volatile ("lock\n\tcmpxchgq %0, %1" // faa assembler
-				: "+r" (oldValue3), "+m" (pAddr3) : : "memory");	
+				: "+r" (oldValue1), "+m" (pAddr1) : : "memory");
 }
 
 void warmUp()
@@ -78,6 +54,13 @@ void warmUp()
 	}
 }
 
+static __inline__ unsigned long long rdtsc(void)
+{
+	unsigned hi, lo;
+	__asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
+	return ((unsigned long long)lo) | (((unsigned long long )hi) << 32 );
+}
+
 void testFunction()
 {
 	bool * pAddr1 = &firstBoolData.heading;
@@ -86,72 +69,83 @@ void testFunction()
 	intAlignedData secondIntData;
 	double * pAddr3 = &firstDoubleData.heading;
 	doubleAlignedData secondDoubleData;
-	high_resolution_clock::time_point start;
-	high_resolution_clock::time_point end;
+	unsigned long long int startRdtsc, endRdtsc;
+	//high_resolution_clock::time_point start;
+	//high_resolution_clock::time_point end;
 	warmUp();
 	for ( long long i = 0; i < testRuns; ++i )
 	{
-	operations += 100000;
+		operations += 100000;
 //======================================================================	
-	start = high_resolution_clock::now();
-	for ( long long i = 0; i < operations; ++i )
-	{
-		functionCASAsm (pAddr1,&firstBoolData.heading,&secondBoolData.heading,&secondBoolData.heading);
-	}
-	end = high_resolution_clock::now();
-	auto elapsed = duration_cast<nanoseconds>(end-start).count();
-	fout << "arrOperations = [arrOperations " << operations << "];" << endl;
-	fout << "arrBoolCasAsmTime = [arrBoolCasAsmTime " << elapsed/operations << "];" << endl;
+		//start = high_resolution_clock::now();
+		startRdtsc = rdtsc();
+		for ( long long i = 0; i < operations; ++i )
+		{
+			functionCASAsm (pAddr1,&firstBoolData.heading,&secondBoolData.heading,&secondBoolData.heading);
+		}
+		endRdtsc = rdtsc();
+		//end = high_resolution_clock::now();
+		//auto elapsed = duration_cast<nanoseconds>(end-start).count();
+		fout << "arrOperations = [arrOperations " << operations << "];" << endl;
+		fout << "arrBoolCasAsmTime = [arrBoolCasAsmTime " << (endRdtsc-startRdtsc)/operations << "];" << endl;
 //======================================================================
-	start = high_resolution_clock::now();
-	for ( long long i = 0; i < operations; ++i )
-	{
-		functionFAAAsm (&firstBoolData.heading,pAddr1);
-	}
-	end = high_resolution_clock::now();
-	elapsed = duration_cast<nanoseconds>(end-start).count();
-	fout << "arrBoolFaaAsmTime = [arrBoolFaaAsmTime " << elapsed/operations << "];" << endl;
+		//start = high_resolution_clock::now();
+		startRdtsc = rdtsc();
+		for ( long long i = 0; i < operations; ++i )
+		{
+			functionFAAAsm (&firstBoolData.heading,pAddr1);
+		}
+		endRdtsc = rdtsc();
+		//end = high_resolution_clock::now();
+		//elapsed = duration_cast<nanoseconds>(end-start).count();
+		fout << "arrBoolFaaAsmTime = [arrBoolFaaAsmTime " << (endRdtsc-startRdtsc)/operations << "];" << endl;
 //======================================================================
-	start = high_resolution_clock::now();
-	for ( long long i = 0; i < operations; ++i )
-	{
-		functionCASAsm (pAddr2,&firstIntData.heading,&secondIntData.heading,&secondIntData.heading);
-	}
-	end = high_resolution_clock::now();
-	elapsed = duration_cast<nanoseconds>(end-start).count();
-	fout << "arrIntCasAsmTime = [arrIntCasAsmTime " << elapsed/operations << "];" << endl;
+		//start = high_resolution_clock::now();
+		startRdtsc = rdtsc();
+		for ( long long i = 0; i < operations; ++i )
+		{
+			functionCASAsm (pAddr2,&firstIntData.heading,&secondIntData.heading,&secondIntData.heading);
+		}
+		endRdtsc = rdtsc();
+		//end = high_resolution_clock::now();
+		//elapsed = duration_cast<nanoseconds>(end-start).count();
+		fout << "arrIntCasAsmTime = [arrIntCasAsmTime " << (endRdtsc-startRdtsc)/operations << "];" << endl;
 //======================================================================
-	start = high_resolution_clock::now();
-	for ( long long i = 0; i < operations; ++i )
-	{
-		functionFAAAsm (&firstIntData.heading,pAddr2);
-	}
-	end = high_resolution_clock::now();
-	elapsed = duration_cast<nanoseconds>(end-start).count();
-	fout << "arrIntFaaAsmTime = [arrIntFaaAsmTime " << elapsed/operations << "];" << endl;
+		//start = high_resolution_clock::now();
+		startRdtsc = rdtsc();
+		for ( long long i = 0; i < operations; ++i )
+		{
+			functionFAAAsm (&firstIntData.heading,pAddr2);
+		}
+		endRdtsc = rdtsc();
+		//end = high_resolution_clock::now();
+		//elapsed = duration_cast<nanoseconds>(end-start).count();
+		fout << "arrIntFaaAsmTime = [arrIntFaaAsmTime " << (endRdtsc-startRdtsc)/operations << "];" << endl;
 //======================================================================
-	start = high_resolution_clock::now();
-	for ( long long i = 0; i < operations; ++i )
-	{
-		functionCASAsm (pAddr3,&firstDoubleData.heading,&secondDoubleData.heading,&secondDoubleData.heading);
-	}
-	end = high_resolution_clock::now();
-	elapsed = duration_cast<nanoseconds>(end-start).count();
-	fout << "arrDoubleCasAsmTime = [arrDoubleCasAsmTime " << elapsed/operations << "];" << endl;
+		//start = high_resolution_clock::now();
+		startRdtsc = rdtsc();
+		for ( long long i = 0; i < operations; ++i )
+		{
+			functionCASAsm (pAddr3,&firstDoubleData.heading,&secondDoubleData.heading,&secondDoubleData.heading);
+		}
+		endRdtsc = rdtsc();
+		//end = high_resolution_clock::now();
+		//elapsed = duration_cast<nanoseconds>(end-start).count();
+		fout << "arrDoubleCasAsmTime = [arrDoubleCasAsmTime " << (endRdtsc-startRdtsc)/operations << "];" << endl;
 //======================================================================
-	start = high_resolution_clock::now();
-	for ( long long i = 0; i < operations; ++i )
-	{
-		functionFAAAsm (&firstDoubleData.heading,pAddr3);
-	}
-	end = high_resolution_clock::now();
-	elapsed = duration_cast<nanoseconds>(end-start).count();
-	fout << "arrDoubleFaaAsmTime = [arrDoubleFaaAsmTime " << elapsed/operations << "];" << endl;
+		//start = high_resolution_clock::now();
+		startRdtsc = rdtsc();
+		for ( long long i = 0; i < operations; ++i )
+		{
+			functionFAAAsm (&firstDoubleData.heading,pAddr3);
+		}
+		endRdtsc = rdtsc();
+		//end = high_resolution_clock::now();
+		//elapsed = duration_cast<nanoseconds>(end-start).count();
+		fout << "arrDoubleFaaAsmTime = [arrDoubleFaaAsmTime " << (endRdtsc-startRdtsc)/operations << "];" << endl;
 //======================================================================
 	//cout << "Iterations = " << operations << endl;
 	}
-	
-	
 }
 
 int main ()
@@ -189,7 +183,7 @@ int main ()
 	fout << "arrDoubleCasAsmTime = smooth(arrDoubleCasAsmTime);" << endl;
 	fout << "arrDoubleFaaAsmTime = smooth(arrDoubleFaaAsmTime);" << endl;
 	fout << "hold on" << endl;
-	fout << "axis([-1000000 22000000 23.5 27.5])" << endl;
+	fout << "axis([-1000000 22000000 54 62])" << endl;
 	fout << "plot(arrOperations,arrBoolCasAsmTime,'*-')" << endl;
 	fout << "plot(arrOperations,arrIntCasAsmTime,'*-')" << endl;
 	fout << "plot(arrOperations,arrDoubleCasAsmTime,'*-')" << endl;
