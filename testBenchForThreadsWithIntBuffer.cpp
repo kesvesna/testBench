@@ -210,6 +210,8 @@ int main ()
 	fout << "plot(arrThreadsNumbers,arrTotalResultCasTime,'*-')" << endl;
 	fout << "plot(arrThreadsNumbers,arrTotalResultFaaTime,'o-')" << endl;
 	fout << "grid on" << endl;
+	fout << "titleString = sprintf('bandwidth test with Int Data Buffer, testRuns = %d', testRuns)" << endl;
+	fout << "title (titleString);" << endl;
 	fout << "legend('CasIntBuffer','FaaIntBuffer')" << endl;
     fout << "ylabel('bandwidth [bytes/cycle]')" << endl;
     fout << "xlabel('threads numbers [pieces]')" << endl;

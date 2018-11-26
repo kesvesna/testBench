@@ -13,7 +13,7 @@ using namespace std::chrono;
 long long warmUpOperations = 10000;
 long long testSizeBuffer = 10000; //2147483647; // 2Gb
 long long iterations = 1000000;
-long long testRuns = 10;
+long long testRuns = 50;
 long long threadsNumber = 1;
 long long maxThreadsNumber = thread::hardware_concurrency();
 bool timeResultsIsStored = false;
@@ -197,7 +197,9 @@ int main ()
 	fout << "plot(arrThreadsNumbers,arrTotalResultCasTime,'*-')" << endl;
 	fout << "plot(arrThreadsNumbers,arrTotalResultFaaTime,'o-')" << endl;
 	fout << "grid on" << endl;
-	fout << "legend('Cas','Faa')" << endl;
+	fout << "titleString = sprintf('bandwidth test with Int, testRuns = %d', testRuns)" << endl;
+	fout << "title (titleString);" << endl;
+	fout << "legend('CasInt','FaaInt')" << endl;
     fout << "ylabel('bandwidth [bytes/cycle]')" << endl;
     fout << "xlabel('threads numbers [pieces]')" << endl;
 	fout.close();
