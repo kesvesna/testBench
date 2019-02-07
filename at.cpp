@@ -13,13 +13,14 @@ using namespace std;
 
 const auto nruns = 10'000'000;
 
-std::atomic<int> atvar(0);
-std::atomic<int> tempVar(0);
+atomic<int> atvar(0);
+atomic<int> tempVar(0);
 int exp = 0;
 int des = 1;
 
-std::atomic<bool> flagIState(false);
-std::atomic<bool> flagSState(false);
+atomic<bool> flagIState(false);
+atomic<bool> flagSState(false);
+atomic<bool> flagMState(false);
 
 
 static __inline__ unsigned long long rdtsc(void) // для замера времени (абстрактного)
@@ -57,6 +58,14 @@ void meas_M()
     //std::cout << "Bandwidth time (M) " << double(nruns)/sumtime << std::endl;
 }
 //=====================================================================================
+void prep_M ()
+{
+	for (auto i = 0; i < nruns; i++) {
+        atvar.store(100); // in Modified state
+        flagMState.store(true);
+        while (flagMState.load() == false) {}
+    }
+}
 // в Owned можно попасть только из Modified попаданием при чтении (probe read hit / Bus Read)
 // если делать read hit, то будет петля на Modified
 // probe write hit this is Bus Read X
@@ -67,15 +76,10 @@ void meas_O()
     //decltype(get_time()) start, end;
     double sumtime = 0;
 
-    // Write var to set M (Modified) state
-    //atvar.store(100);
-     // Read var to set O (Owned) state ???
-    //tempVar.store(atvar);
-
     for (auto i = 0; i < nruns; i++) {
+        while (flagMState.load() == false) {}
         //start = get_time();
-        atvar.store(100); // may be need barriers ??? (i mean for example StoreStore)?
-        tempVar.store(atvar);
+        tempVar.store(atvar); // in Owned state
         startRdtsc1 = rdtsc();
         atvar.compare_exchange_weak(exp, des);
         endRdtsc1 = rdtsc();
@@ -83,8 +87,9 @@ void meas_O()
 
        // auto elapsed = std::chrono::duration_cast
           //  <std::chrono::nanoseconds>(end - start).count();
-        auto elapsed = (endRdtsc1 - startRdtsc1);  
+        auto elapsed = (endRdtsc1 - startRdtsc1);
         sumtime += elapsed;
+        flagMState.store(true);
     }
 
     std::cout << "Latency time (O) " << double(sumtime)/nruns << std::endl;
@@ -191,14 +196,18 @@ int main(int argc, const char *argv[])
 	
 	meas_E(); 
     meas_M();
-    meas_O(); // To Owned only from Modified by probe read hit
-    
+    // measure for O state
+    std::thread meas_O_thr(meas_O), prep_M_thr(prep_M);
+    meas_O_thr.join();
+    prep_M_thr.join();
     // measure for I state
+    flagIState.store(false);
     std::thread meas_I_thr(meas_I), prep_I_thr(prep_I);
     meas_I_thr.join();
     prep_I_thr.join();
     
     // measure for S state
+    flagSState.store(false);
     std::thread meas_S_thr(meas_S), prep_S_thr(prep_S);
     meas_S_thr.join();
     prep_S_thr.join();
