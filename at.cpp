@@ -11,7 +11,7 @@
 
 using namespace std;
 
-const auto nruns = 10'000'000;
+const auto nruns = 100'000'000;
 
 atomic<int> atvar(0);
 atomic<int> tempVar(0);
@@ -63,7 +63,7 @@ void prep_M ()
 	for (auto i = 0; i < nruns; i++) {
         atvar.store(100); // in Modified state
         flagMState.store(true);
-        while (flagMState.load() == false) {}
+        while (flagMState.load() == true) {}
     }
 }
 // в Owned можно попасть только из Modified попаданием при чтении (probe read hit / Bus Read)
@@ -89,7 +89,7 @@ void meas_O()
           //  <std::chrono::nanoseconds>(end - start).count();
         auto elapsed = (endRdtsc1 - startRdtsc1);
         sumtime += elapsed;
-        flagMState.store(true);
+        flagMState.store(false);
     }
 
     std::cout << "Latency time (O) " << double(sumtime)/nruns << std::endl;
@@ -139,7 +139,7 @@ void meas_I()
         auto elapsed = (endRdtsc1 - startRdtsc1);
         sumtime += elapsed;
 
-        flagIState.store(true);
+        flagIState.store(false);
     }
 
     std::cout << "Latency time (I) " << double(sumtime)/nruns << std::endl;
@@ -166,7 +166,7 @@ void meas_S()
           //  <std::chrono::nanoseconds>(end - start).count();
         auto elapsed = (endRdtsc1 - startRdtsc1);
         sumtime += elapsed;
-        flagSState.store(true);
+        flagSState.store(false);
     }
 
     std::cout << "Latency time (S) " << double(sumtime)/nruns << std::endl;
@@ -178,7 +178,7 @@ void prep_S()
     for (auto i = 0; i < nruns; i++) {
         tempVar.store(atvar);
         flagSState.store(true);
-        while (flagSState.load() == false) {}
+        while (flagSState.load() == true) {}
     }
 }
 //==================================================================================
@@ -187,7 +187,7 @@ void prep_I()
     for (auto i = 0; i < nruns; i++) {
         atvar.store(100);
         flagIState.store(true);
-        while (flagIState.load() == false) {}
+        while (flagIState.load() == true) {}
     }
 }
 //===================================================================================
@@ -197,9 +197,11 @@ int main(int argc, const char *argv[])
 	meas_E(); 
     meas_M();
     // measure for O state
+    flagMState.store(false);
     std::thread meas_O_thr(meas_O), prep_M_thr(prep_M);
     meas_O_thr.join();
     prep_M_thr.join();
+    
     // measure for I state
     flagIState.store(false);
     std::thread meas_I_thr(meas_I), prep_I_thr(prep_I);
