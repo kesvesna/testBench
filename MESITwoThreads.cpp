@@ -35,12 +35,12 @@ atomic<bool> flagEState(false);
 unsigned long long testSizeBuffer = startDataSize + (268435456 )/1; // 1073741824 byte = 1Gb, 2147483648 = 2Gb
 atomic<int> * buffer = (atomic<int> *) malloc(testSizeBuffer*sizeof(atomic<int>));
 
-pthread_barrier_t open_barrier;
+//pthread_barrier_t open_barrier;
 ofstream fout;
 //======================================================================
 //======================================================================
 
-unsigned long long dataSizeScaleTune (unsigned long long dataSize)
+unsigned long long dataSizeScaleTune (unsigned long long dataSize) // изменение шага между замерами данных для ускорения теста
 {
 	unsigned long long cycleStep = startCycleStep;
 	if (dataSize >= 33554432) cycleStep = 117440512;                  // if data => 128M
@@ -52,7 +52,7 @@ unsigned long long dataSizeScaleTune (unsigned long long dataSize)
 	return cycleStep;
 }
 
-int nrunsScaleTune (unsigned long long dataSize)
+int nrunsScaleTune (unsigned long long dataSize) // уменьшение циклов теста для ускорения при больших данных
 {
 	int nruns = startNRuns;
 	if (dataSize >= 33554432) nruns = 2;                                // if data => 128M
@@ -63,7 +63,7 @@ int nrunsScaleTune (unsigned long long dataSize)
 	if (dataSize < 4096 && dataSize >= 256)         nruns = 10000;          //  1K <= data < 16K
 	return nruns;
 }
-void inline clflush(atomic<int>* buffer, unsigned long long testSizeBuffer)
+void inline clflush(atomic<int>* buffer, unsigned long long testSizeBuffer) // очистка всех кэшей (под вопросом)
 {
   unsigned long long addr,passes,linesize;
 
@@ -82,7 +82,7 @@ void inline clflush(atomic<int>* buffer, unsigned long long testSizeBuffer)
 }
 //======================================================================
 //======================================================================
-void * meas_M1(void * arg)
+void * meas_M1(void * arg) // замер CAS для удаленных ядер
 {
     auto get_time = std::chrono::steady_clock::now;
     decltype(get_time()) start, end;
@@ -118,7 +118,7 @@ void * meas_M1(void * arg)
 	} 
 }
 //=====================================================================================
-void * meas_M2(void * arg)
+void * meas_M2(void * arg) // замер CAS для близлежащих ядер
 {
     auto get_time = std::chrono::steady_clock::now;
     decltype(get_time()) start, end;
@@ -211,7 +211,7 @@ void meas_O()
 	}
 }
 //=================================================================================
-void * meas_E1(void * arg)
+void * meas_E1(void * arg) // замер CAS для удаленных ядер
 {
 	auto get_time = std::chrono::steady_clock::now;
     decltype(get_time()) start, end;
@@ -247,7 +247,7 @@ void * meas_E1(void * arg)
     
 }
 //===================================================================================
-void * meas_E2(void * arg)
+void * meas_E2(void * arg) // замер CAS для близлежащих ядер
 {
 	auto get_time = std::chrono::steady_clock::now;
     decltype(get_time()) start, end;
@@ -284,7 +284,7 @@ void * meas_E2(void * arg)
 }
 //===================================================================================
 
-void * meas_I1 (void * arg)
+void * meas_I1 (void * arg) // замер CAS для удаленных ядер
 {
     auto get_time = std::chrono::steady_clock::now;
     decltype(get_time()) start, end;
@@ -315,7 +315,7 @@ void * meas_I1 (void * arg)
 	}
 }
 //==================================================================================
-void * meas_I2(void * arg)
+void * meas_I2(void * arg) // замер CAS для близлежащих ядер
 {
     auto get_time = std::chrono::steady_clock::now;
     decltype(get_time()) start, end;
@@ -346,7 +346,7 @@ void * meas_I2(void * arg)
 	}
 }
 //===================================================================================
-void * meas_S1(void * arg)
+void * meas_S1(void * arg) // замер CAS для удаленных ядер
 {
     auto get_time = std::chrono::steady_clock::now;
     decltype(get_time()) start, end;
@@ -381,7 +381,7 @@ void * meas_S1(void * arg)
 	}
 }
 //==================================================================================
-void * meas_S2(void * arg)
+void * meas_S2(void * arg) // замер CAS для близлежащих ядер
 {
     auto get_time = std::chrono::steady_clock::now;
     decltype(get_time()) start, end;
@@ -458,7 +458,7 @@ void * prep_I(void * arg)
     
 }
 //===================================================================================
-void * prep_flush_cashes(void * arg)
+void * prep_flush_cashes(void * arg) // сброс всех кэшей для использования состояния Invalidate
 {
 	unsigned long long cycleStep = startCycleStep; 
 	unsigned long long dataSize = startDataSize;
@@ -527,7 +527,7 @@ int main(int argc, const char *argv[])
 	//pthread_barrier_init(&open_barrier, NULL, 2);
 	cpu_set_t mask;
 	flagSState.store(false);
-	for (int i = 0; i <= 3; i += 3) 
+	for (int i = 0; i <= 3; i += 3) // потоки для ядер 1 и 4, чтобы увеличить расстояние между кэш L2
 	{	  
 		CPU_ZERO(&mask);
 		CPU_SET(i, &mask);
@@ -548,7 +548,7 @@ int main(int argc, const char *argv[])
 	}
 	//=================================================================
 	flagSState.store(false);
-	for (int i = 0; i <= 1; i++) 
+	for (int i = 0; i <= 1; i++) // потоки между ядрами 1 и 2, близкое расстояние, кэш L2 общий
 	{	  
 		CPU_ZERO(&mask);
 		CPU_SET(i, &mask);
